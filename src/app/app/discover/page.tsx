@@ -1,309 +1,243 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useAuth } from '@/lib/auth-context'
-import type { Activity } from '@/lib/types'
-import { Heart, X, Star, MapPin, Clock, DollarSign, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Filter, MapPin, Star, X, Heart } from "lucide-react"
+import { ImageWithFallback } from "@/components/ImageWithFallback"
+import { useState } from "react"
+import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion"
+import { useTrip } from "@/lib/trip-context"
+
+const places = [
+  { id: 1, name: "La Boqueria Secret Stalls", location: "El Raval, Barcelona", description: "Skip the tourist-packed main aisles. Back stalls serve the best jamón ibérico and fresh seafood.", price: "$$", duration: "1-2h", rating: 9.2, tags: ["SideQuest", "Food"], image: "barcelona market food" },
+  { id: 2, name: "Bunkers del Carmel", location: "El Carmel, Barcelona", description: "Panoramic sunset views over the entire city. Bring wine and snacks for the perfect evening.", price: "$", duration: "2-3h", rating: 9.5, tags: ["SideQuest", "Views"], image: "barcelona sunset views" },
+  { id: 3, name: "Gothic Quarter Walk", location: "Barri Gòtic, Barcelona", description: "Wander through medieval streets, hidden squares, and discover ancient Roman walls.", price: "$", duration: "2h", rating: 9.2, tags: ["SideQuest", "Culture"], image: "barcelona gothic quarter" },
+  { id: 4, name: "Park Güell Hidden Spots", location: "Gràcia, Barcelona", description: "Early morning visits reveal quiet corners and the best light for photos before crowds arrive.", price: "$$", duration: "2-3h", rating: 9.4, tags: ["SideQuest", "Nature"], image: "park guell barcelona" },
+  { id: 5, name: "El Born Market", location: "El Born, Barcelona", description: "Ancient ruins beneath a modern food hall. History meets amazing tapas and local wine.", price: "$$$", duration: "1-2h", rating: 8.9, tags: ["SideQuest", "Food"], image: "el born market barcelona" },
+  { id: 6, name: "Retiro Park Rowboats", location: "Madrid Centro", description: "Rent a rowboat on the crystal palace lake. Perfect afternoon escape from the city heat.", price: "$", duration: "1-2h", rating: 9.0, tags: ["SideQuest", "Nature"], image: "madrid retiro park lake" },
+  { id: 7, name: "Sobrino de Botín", location: "Madrid", description: "World's oldest restaurant (1725). Order the roast suckling pig—it's legendary.", price: "$$$", duration: "2h", rating: 9.3, tags: ["Must Do", "Food"], image: "madrid restaurant traditional" },
+  { id: 8, name: "Prado Museum Highlights", location: "Madrid", description: "Skip the full tour. Hit Velázquez, Goya, and Bosch. 90 minutes of pure art history.", price: "$$", duration: "1.5h", rating: 9.6, tags: ["Must Do", "Culture"], image: "prado museum madrid" },
+  { id: 9, name: "Malasaña Tapas Crawl", location: "Madrid", description: "Hipster neighborhood with the best vermouth bars. 3 stops, 3 hours, endless tapas.", price: "$$", duration: "3h", rating: 9.4, tags: ["SideQuest", "Food"], image: "madrid malasana tapas" },
+  { id: 10, name: "Tram 28 Full Loop", location: "Alfama, Lisbon", description: "Historic yellow tram through Lisbon's steepest hills. Go early to avoid the crowds.", price: "$", duration: "45min", rating: 8.8, tags: ["Must Do", "Views"], image: "lisbon tram 28" },
+  { id: 11, name: "LX Factory Sunset", location: "Alcântara, Lisbon", description: "Converted factory complex with street art, rooftop bars, and river views at golden hour.", price: "$$", duration: "2h", rating: 9.1, tags: ["SideQuest", "Views"], image: "lisbon lx factory" },
+  { id: 12, name: "Pastéis de Belém", location: "Belém, Lisbon", description: "The original custard tart recipe since 1837. There's a reason locals queue here daily.", price: "$", duration: "30min", rating: 9.7, tags: ["Must Do", "Food"], image: "lisbon pasteis belem" },
+]
 
 export default function DiscoverPage() {
-  const { user } = useAuth()
-  const [activities, setActivities] = useState<Activity[]>([])
+  const { activeTrip } = useTrip()
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [selectedCity, setSelectedCity] = useState('')
-  const [cities, setCities] = useState<string[]>([])
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null)
-  const [imageIndex, setImageIndex] = useState(0)
-  const supabase = createClient()
+  const [intensity, setIntensity] = useState(0)
+  const sliderX = useMotionValue(0)
 
-  const loadActivities = useCallback(async () => {
-    setLoading(true)
-    let query = supabase
-      .from('activities')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50)
+  const cities = activeTrip
+    ? activeTrip.cities.map((city, index) => ({ name: city.name, flag: city.flag, active: index === 0 }))
+    : [
+        { name: "Barcelona", flag: "🇪🇸", active: true },
+        { name: "Madrid", flag: "🇪🇸", active: false },
+        { name: "Lisbon", flag: "🇵🇹", active: false },
+      ]
 
-    if (selectedCity) {
-      query = query.eq('city', selectedCity)
-    }
-
-    const { data } = await query
-    if (data) {
-      // Shuffle
-      const shuffled = [...data].sort(() => Math.random() - 0.5)
-      setActivities(shuffled)
-      setCurrentIndex(0)
-      setImageIndex(0)
-    }
-    setLoading(false)
-  }, [supabase, selectedCity])
-
-  useEffect(() => {
-    loadActivities()
-  }, [loadActivities])
-
-  // Load available cities
-  useEffect(() => {
-    const loadCities = async () => {
-      const { data } = await supabase
-        .from('activities')
-        .select('city')
-        .not('city', 'is', null)
-      if (data) {
-        const unique = [...new Set(data.map(a => a.city).filter(Boolean))] as string[]
-        setCities(unique.sort())
-      }
-    }
-    loadCities()
-  }, [supabase])
-
-  const currentActivity = activities[currentIndex]
-
-  const handleSwipe = async (direction: 'left' | 'right', isSuperLike = false) => {
-    if (!currentActivity || !user) return
-
-    setSwipeDirection(direction)
-
-    if (direction === 'right') {
-      // Save activity
-      await supabase.from('saved_activities').upsert({
-        user_id: user.id,
-        activity_id: currentActivity.id,
-        is_super_like: isSuperLike,
-      }, { onConflict: 'user_id,activity_id' })
-    }
-
+  const removeCard = () => {
     setTimeout(() => {
-      setSwipeDirection(null)
-      setCurrentIndex(prev => prev + 1)
-      setImageIndex(0)
+      setCurrentIndex((prev) => (prev + 1) % places.length)
+      setIntensity(0)
+      sliderX.set(0)
     }, 300)
   }
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') handleSwipe('left')
-      if (e.key === 'ArrowRight') handleSwipe('right')
-      if (e.key === 'ArrowUp') handleSwipe('right', true)
+  const handleSliderDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const maxOffset = 140 - 24
+    const normalizedValue = Math.max(-1, Math.min(1, info.offset.x / maxOffset))
+    setIntensity(normalizedValue)
+  }
+
+  const handleSliderDragEnd = () => {
+    if (intensity < -0.65) {
+      removeCard()
+    } else if (intensity > 0.65) {
+      removeCard()
+    } else {
+      setIntensity(0)
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  })
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="w-8 h-8 text-orange animate-spin" />
-      </div>
-    )
+    sliderX.set(0)
   }
 
-  if (!currentActivity || currentIndex >= activities.length) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[80vh] px-6 text-center">
-        <Compass className="w-16 h-16 text-dim mb-4" />
-        <h2 className="text-xl font-semibold mb-2">No more activities</h2>
-        <p className="text-mid mb-6">You&apos;ve seen everything{selectedCity ? ` in ${selectedCity}` : ''}!</p>
-        <button onClick={() => { setCurrentIndex(0); loadActivities() }} className="btn-teal">
-          Refresh
-        </button>
-      </div>
-    )
-  }
-
-  const images = currentActivity.images?.length
-    ? currentActivity.images
-    : currentActivity.image_url
-      ? [currentActivity.image_url]
-      : []
+  const currentPlace = places[currentIndex]
+  const remainingCards = places.length - currentIndex
 
   return (
-    <div className="px-4 pt-4">
-      {/* City Filter */}
-      <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-        <button
-          onClick={() => setSelectedCity('')}
-          className={`chip whitespace-nowrap ${!selectedCity ? 'chip-active' : 'chip-inactive'}`}
-        >
-          All Cities
+    <div className="px-5 py-4 h-screen flex flex-col max-w-md mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-5 pt-1">
+        <h1 className="text-[28px] tracking-tight text-zinc-900 dark:text-white">Discover</h1>
+        <button className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-900 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-sm dark:shadow-none border border-zinc-200/50 dark:border-transparent">
+          <Filter className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
         </button>
-        {cities.map(city => (
+      </div>
+
+      {/* City Pills */}
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1 scrollbar-hide">
+        {cities.map((city) => (
           <button
-            key={city}
-            onClick={() => setSelectedCity(city)}
-            className={`chip whitespace-nowrap ${selectedCity === city ? 'chip-active' : 'chip-inactive'}`}
+            key={city.name}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-full whitespace-nowrap transition-all ${
+              city.active
+                ? "bg-zinc-900 dark:bg-white text-white dark:text-black shadow-md"
+                : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 shadow-sm dark:shadow-none border border-zinc-200/50 dark:border-transparent"
+            }`}
           >
-            {city}
+            <span className="text-lg">{city.flag}</span>
+            <span className="text-[15px] font-medium">{city.name}</span>
           </button>
         ))}
       </div>
 
-      {/* Progress */}
-      <div className="flex items-center justify-between text-xs text-dim mb-3">
-        <span>{currentIndex + 1} / {activities.length}</span>
-        {currentActivity.is_sidequest && (
-          <span className="bg-gold/20 text-gold px-2 py-0.5 rounded-full text-xs font-medium">
-            Hidden Gem
-          </span>
+      {/* Card Stack */}
+      <div className="flex-1 relative mb-5 min-h-0">
+        {remainingCards > 0 ? (
+          <>
+            {currentIndex + 1 < places.length && (
+              <div className="absolute inset-0 rounded-[28px] bg-zinc-300/40 dark:bg-zinc-900/60 backdrop-blur-sm" style={{ transform: 'scale(0.95) translateY(8px)', zIndex: 1 }} />
+            )}
+            {currentIndex + 2 < places.length && (
+              <div className="absolute inset-0 rounded-[28px] bg-zinc-300/25 dark:bg-zinc-800/40" style={{ transform: 'scale(0.90) translateY(16px)', zIndex: 0 }} />
+            )}
+            <SwipeCard place={currentPlace} intensity={intensity} key={currentPlace.id} />
+          </>
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center px-8">
+              <div className="text-6xl mb-4">✨</div>
+              <h3 className="text-xl text-zinc-900 dark:text-white mb-2">All Caught Up!</h3>
+              <p className="text-zinc-500 dark:text-zinc-400 text-[15px]">Check back later for more recommendations</p>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentActivity.id}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-            x: swipeDirection === 'left' ? -300 : swipeDirection === 'right' ? 300 : 0,
-            rotate: swipeDirection === 'left' ? -15 : swipeDirection === 'right' ? 15 : 0,
-          }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          className="card p-0 overflow-hidden"
-        >
-          {/* Image */}
-          <div className="relative h-72 bg-raised">
-            {images.length > 0 ? (
-              <>
-                <img
-                  src={images[imageIndex] || images[0]}
-                  alt={currentActivity.name}
-                  className="w-full h-full object-cover"
-                />
-                {images.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => setImageIndex(prev => Math.max(0, prev - 1))}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 rounded-full p-1"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setImageIndex(prev => Math.min(images.length - 1, prev + 1))}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 rounded-full p-1"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                      {images.map((_, i) => (
-                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === imageIndex ? 'bg-white' : 'bg-white/40'}`} />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <MapPin className="w-12 h-12 text-dim" />
-              </div>
-            )}
-
-            {/* Swipe overlays */}
-            {swipeDirection === 'right' && (
-              <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                <span className="text-4xl font-bold text-green-400 rotate-[-20deg] border-4 border-green-400 px-6 py-2 rounded-xl">
-                  LIKE
-                </span>
-              </div>
-            )}
-            {swipeDirection === 'left' && (
-              <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                <span className="text-4xl font-bold text-red-400 rotate-[20deg] border-4 border-red-400 px-6 py-2 rounded-xl">
-                  PASS
-                </span>
-              </div>
-            )}
+      {/* Intensity Slider */}
+      <div className="pb-1">
+        <div className="flex justify-between items-center text-[13px] text-zinc-600 dark:text-zinc-400 mb-3 px-1 font-medium">
+          <div className="flex items-center gap-1.5">
+            <X className="w-4 h-4 text-red-500 dark:text-red-400" />
+            <span>Pass</span>
           </div>
+          <span className="text-zinc-400 dark:text-zinc-500 tracking-wider text-[11px] uppercase">Intensity</span>
+          <div className="flex items-center gap-1.5">
+            <span>Save</span>
+            <Heart className="w-4 h-4 text-teal-500 dark:text-teal-400" />
+          </div>
+        </div>
 
-          {/* Info */}
-          <div className="p-5">
-            <h2 className="text-xl font-bold mb-1">{currentActivity.name}</h2>
-
-            <div className="flex items-center gap-3 text-sm text-mid mb-3">
-              {currentActivity.city && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
-                  {currentActivity.city}
-                  {currentActivity.neighborhood && ` · ${currentActivity.neighborhood}`}
-                </span>
-              )}
-            </div>
-
-            <p className="text-mid text-sm leading-relaxed mb-4 line-clamp-3">
-              {currentActivity.description}
-            </p>
-
-            <div className="flex items-center gap-4 text-xs text-dim">
-              {currentActivity.duration_minutes && (
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {currentActivity.duration_minutes}min
-                </span>
-              )}
-              {currentActivity.cost_tier && (
-                <span className="flex items-center gap-1">
-                  <DollarSign className="w-3.5 h-3.5" />
-                  {currentActivity.cost_tier}
-                </span>
-              )}
-              {currentActivity.experience_tag && (
-                <span className="bg-raised px-2 py-0.5 rounded-full">
-                  {currentActivity.experience_tag}
-                </span>
-              )}
-            </div>
-
-            {/* Tags */}
-            {currentActivity.tags && currentActivity.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {currentActivity.tags.slice(0, 4).map(tag => (
-                  <span key={tag} className="bg-raised text-dim text-xs px-2.5 py-1 rounded-full">
-                    {tag}
-                  </span>
-                ))}
+        <div className="relative h-[60px] rounded-full bg-gradient-to-r from-red-50 dark:from-red-950/30 via-zinc-100 dark:via-zinc-900 to-teal-50 dark:to-teal-950/30 border-2 border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-lg dark:shadow-xl">
+          <div
+            className="absolute inset-0 transition-all duration-150"
+            style={{
+              background: intensity < 0
+                ? `linear-gradient(to right, rgba(239, 68, 68, ${Math.abs(intensity) * 0.5}), transparent 60%)`
+                : intensity > 0
+                ? `linear-gradient(to left, rgba(20, 184, 166, ${intensity * 0.5}), transparent 60%)`
+                : 'transparent'
+            }}
+          />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-8 bg-zinc-300 dark:bg-zinc-700/50" />
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: -130, right: 130 }}
+            dragElastic={0.05}
+            onDrag={handleSliderDrag}
+            onDragEnd={handleSliderDragEnd}
+            style={{ x: sliderX }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[52px] h-[52px] rounded-full bg-zinc-900 dark:bg-white shadow-2xl cursor-grab active:cursor-grabbing flex items-center justify-center z-10"
+            animate={{ scale: Math.abs(intensity) > 0.4 ? 1.15 : 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            {intensity < -0.3 && <X className="w-6 h-6 text-white dark:text-red-500" strokeWidth={2.5} />}
+            {intensity > 0.3 && <Heart className="w-6 h-6 text-white dark:text-teal-500 fill-current" />}
+            {Math.abs(intensity) <= 0.3 && (
+              <div className="flex gap-1">
+                <div className="w-1 h-1 rounded-full bg-white dark:bg-zinc-300" />
+                <div className="w-1 h-1 rounded-full bg-white dark:bg-zinc-300" />
+                <div className="w-1 h-1 rounded-full bg-white dark:bg-zinc-300" />
               </div>
             )}
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Action Buttons */}
-      <div className="flex items-center justify-center gap-6 mt-6">
-        <button
-          onClick={() => handleSwipe('left')}
-          className="w-14 h-14 rounded-full bg-raised border border-border flex items-center justify-center hover:bg-red-500/20 hover:border-red-500/50 transition-all active:scale-90"
-        >
-          <X className="w-6 h-6 text-red-400" />
-        </button>
-
-        <button
-          onClick={() => handleSwipe('right', true)}
-          className="w-12 h-12 rounded-full bg-raised border border-border flex items-center justify-center hover:bg-gold/20 hover:border-gold/50 transition-all active:scale-90"
-        >
-          <Star className="w-5 h-5 text-gold" />
-        </button>
-
-        <button
-          onClick={() => handleSwipe('right')}
-          className="w-14 h-14 rounded-full bg-raised border border-border flex items-center justify-center hover:bg-green-500/20 hover:border-green-500/50 transition-all active:scale-90"
-        >
-          <Heart className="w-6 h-6 text-green-400" />
-        </button>
+          </motion.div>
+        </div>
       </div>
-
-      <p className="text-center text-dim/50 text-xs mt-4">
-        ← Pass · ↑ Super Like · Like →
-      </p>
     </div>
   )
 }
 
-function Compass({ className }: { className?: string }) {
-  return <MapPin className={className} />
+interface SwipeCardProps {
+  place: typeof places[0]
+  intensity: number
+}
+
+function SwipeCard({ place, intensity }: SwipeCardProps) {
+  return (
+    <motion.div
+      className="absolute inset-0"
+      animate={{ x: intensity * 45, rotate: intensity * 8 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      style={{ zIndex: 2 }}
+    >
+      <div className="h-full rounded-[28px] overflow-hidden bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/50 dark:border-transparent flex flex-col">
+        {/* Image */}
+        <div className="relative flex-1 min-h-0 bg-gradient-to-br from-orange-900 to-orange-700">
+          <ImageWithFallback
+            src={`https://source.unsplash.com/featured/?${encodeURIComponent(place.image)}`}
+            alt={place.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
+
+          {/* Swipe Indicators */}
+          <motion.div
+            className="absolute top-6 left-6 bg-red-500 text-white px-5 py-2.5 rounded-xl text-lg font-bold rotate-[-15deg] border-[3px] border-white shadow-2xl"
+            animate={{ opacity: intensity < -0.3 ? 1 : 0, scale: intensity < -0.3 ? 1 : 0.8 }}
+            transition={{ duration: 0.2 }}
+          >
+            PASS
+          </motion.div>
+          <motion.div
+            className="absolute top-6 right-6 bg-teal-500 text-white px-5 py-2.5 rounded-xl text-lg font-bold rotate-[15deg] border-[3px] border-white shadow-2xl"
+            animate={{ opacity: intensity > 0.3 ? 1 : 0, scale: intensity > 0.3 ? 1 : 0.8 }}
+            transition={{ duration: 0.2 }}
+          >
+            SAVE
+          </motion.div>
+
+          {/* Tags */}
+          <div className="absolute top-5 left-5 right-5 flex justify-between">
+            <span className="bg-orange-600 text-white px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-md shadow-lg">
+              {place.tags[0]}
+            </span>
+            <span className="bg-white/95 text-black px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-md shadow-lg">
+              {place.tags[1]}
+            </span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white p-6">
+          <div className="mb-4">
+            <h3 className="text-[22px] leading-tight mb-2 font-semibold text-zinc-900 dark:text-white">{place.name}</h3>
+            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 mb-3">
+              <MapPin className="w-4 h-4" strokeWidth={2} />
+              <span className="text-[15px]">{place.location}</span>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 text-[15px] leading-relaxed">{place.description}</p>
+          </div>
+          <div className="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-4">
+              <span className="text-zinc-700 dark:text-zinc-300 text-[15px] font-medium">{place.price}</span>
+              <span className="text-zinc-500 dark:text-zinc-400 text-[14px]">{place.duration}</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-full border border-amber-100 dark:border-transparent">
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              <span className="text-[15px] font-semibold text-zinc-900 dark:text-amber-400">{place.rating}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
 }

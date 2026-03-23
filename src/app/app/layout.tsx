@@ -1,44 +1,54 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
-import { AuthProvider } from '@/lib/auth-context'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Compass, Map, User, Loader2, Shuffle } from 'lucide-react'
+import { Compass, Plane, User } from 'lucide-react'
+import { TripProvider, useTrip } from '@/lib/trip-context'
+import { BudgetProvider } from '@/lib/budget-context'
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { activeTrip } = useTrip()
 
-  const tabs = [
-    { href: '/app/discover', icon: Compass, label: 'Discover' },
-    { href: '/app/blind-match', icon: Shuffle, label: 'Blind Match' },
-    { href: '/app/trips', icon: Map, label: 'Trips' },
-    { href: '/app/profile', icon: User, label: 'Profile' },
+  const navItems = [
+    { path: "/app/discover", label: "Discover", icon: Compass },
+    { path: "/app/trips", label: activeTrip ? activeTrip.name : "Trips", icon: Plane, isContextual: true },
+    { path: "/app/profile", label: "Profile", icon: User },
   ]
 
   return (
-    <div className="min-h-screen bg-bg pb-20">
-      {/* Page Content */}
-      <main className="max-w-lg mx-auto">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white pb-24">
+      <main className="max-w-md mx-auto">
         {children}
       </main>
 
-      {/* Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border/30">
-        <div className="max-w-lg mx-auto flex items-center justify-around py-2">
-          {tabs.map((tab) => {
-            const isActive = pathname.startsWith(tab.href)
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-zinc-950/95 border-t border-zinc-200/60 dark:border-zinc-800/50 backdrop-blur-xl shadow-2xl z-50">
+        <div className="max-w-md mx-auto flex justify-around items-center h-20 px-2">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.path ||
+              (item.path === "/app/trips" && pathname.startsWith("/app/trips"))
+
             return (
               <Link
-                key={tab.href}
-                href={tab.href}
-                className={`flex flex-col items-center gap-1 py-2 px-6 transition-colors ${
-                  isActive ? 'text-orange' : 'text-dim hover:text-mid'
-                }`}
+                key={item.path}
+                href={item.path}
+                className="flex flex-col items-center gap-1.5 py-2 px-3 rounded-2xl transition-all relative"
               >
-                <tab.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{tab.label}</span>
+                {isActive && (
+                  <div className="absolute inset-0 bg-orange-600/10 rounded-2xl" />
+                )}
+                <Icon
+                  className={`w-6 h-6 transition-all relative z-10 ${
+                    isActive ? 'text-orange-500' : 'text-zinc-500 dark:text-zinc-500'
+                  }`}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+                <span className={`text-[11px] font-medium transition-all relative z-10 truncate max-w-[70px] ${
+                  isActive ? 'text-orange-500' : 'text-zinc-500 dark:text-zinc-500'
+                }`}>
+                  {item.label}
+                </span>
               </Link>
             )
           })}
@@ -49,44 +59,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [checking, setChecking] = useState(true)
-  const [authenticated, setAuthenticated] = useState(false)
-  const router = useRouter()
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.replace('/login')
-      } else {
-        setAuthenticated(true)
-      }
-      setChecking(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.replace('/login')
-        setAuthenticated(false)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [router])
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-orange animate-spin" />
-      </div>
-    )
-  }
-
-  if (!authenticated) return null
-
   return (
-    <AuthProvider>
-      <AppShell>{children}</AppShell>
-    </AuthProvider>
+    <TripProvider>
+      <BudgetProvider>
+        <AppShell>{children}</AppShell>
+      </BudgetProvider>
+    </TripProvider>
   )
 }

@@ -4,56 +4,38 @@
 
 @layer base {
   body {
-    @apply bg-bg text-white antialiased;
+    @apply antialiased;
   }
 
-  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-bg;
+    @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-raised rounded-full;
+    @apply bg-zinc-300 dark:bg-zinc-700 rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-dim;
+    @apply bg-zinc-400 dark:bg-zinc-600;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-orange hover:bg-orange-light text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 active:scale-95;
-  }
-  .btn-secondary {
-    @apply bg-raised hover:bg-border text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 active:scale-95;
-  }
-  .btn-teal {
-    @apply bg-teal hover:bg-teal-light text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 active:scale-95;
-  }
-  .card {
-    @apply bg-card rounded-card border border-border/50 p-5;
-  }
-  .card-raised {
-    @apply bg-raised rounded-card border border-border/50 p-5;
+    @apply bg-gradient-to-br from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg shadow-orange-600/30 active:scale-95;
   }
   .input-field {
-    @apply w-full bg-raised border border-border rounded-button px-4 py-3 text-white placeholder-dim focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal transition-colors;
-  }
-  .chip {
-    @apply px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer;
-  }
-  .chip-active {
-    @apply bg-teal text-white;
-  }
-  .chip-inactive {
-    @apply bg-raised text-mid hover:bg-border;
-  }
-  .tab-active {
-    @apply text-orange border-b-2 border-orange font-semibold;
-  }
-  .tab-inactive {
-    @apply text-dim hover:text-mid border-b-2 border-transparent;
+    @apply w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-5 py-4 text-[15px] text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all shadow-sm dark:shadow-none;
   }
 }

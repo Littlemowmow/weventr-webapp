@@ -1,288 +1,162 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useAuth } from '@/lib/auth-context'
-import type { Trip } from '@/lib/types'
-import Link from 'next/link'
-import { Plus, MapPin, Calendar, Users, Loader2, X } from 'lucide-react'
+import { Plus, ChevronRight, Users, Bookmark, MapPin } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useTrip } from "@/lib/trip-context"
+import { useEffect } from "react"
 
 export default function TripsPage() {
-  const { user } = useAuth()
-  const [trips, setTrips] = useState<Trip[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const supabase = createClient()
-
-  const loadTrips = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-
-    // Get trips where user is owner
-    const { data: ownedTrips } = await supabase
-      .from('trips')
-      .select('*')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false })
-
-    // Get trips where user is a member
-    const { data: memberTrips } = await supabase
-      .from('trip_members')
-      .select('trip_id')
-      .eq('user_id', user.id)
-
-    let allTrips = ownedTrips || []
-
-    if (memberTrips && memberTrips.length > 0) {
-      const memberTripIds = memberTrips
-        .map(m => m.trip_id)
-        .filter(id => !allTrips.some(t => t.id === id))
-
-      if (memberTripIds.length > 0) {
-        const { data: extraTrips } = await supabase
-          .from('trips')
-          .select('*')
-          .in('id', memberTripIds)
-
-        if (extraTrips) allTrips = [...allTrips, ...extraTrips]
-      }
-    }
-
-    setTrips(allTrips)
-    setLoading(false)
-  }, [user, supabase])
+  const { activeTrip, setActiveTrip, trips } = useTrip()
+  const router = useRouter()
 
   useEffect(() => {
-    loadTrips()
-  }, [loadTrips])
+    if (activeTrip) setActiveTrip(null)
+  }, [])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="w-8 h-8 text-orange animate-spin" />
-      </div>
-    )
+  const activeTrips = trips.filter(t => t.status === "Active")
+  const completedTrips = trips.filter(t => t.status === "Completed")
+
+  const handleTripClick = (trip: typeof trips[0]) => {
+    router.push(`/app/trips/${trip.id}`)
   }
 
   return (
-    <div className="px-4 pt-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Your Trips</h1>
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-sm py-2 px-4 flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          New Trip
-        </button>
+    <div className="px-5 py-4 max-w-md mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 pt-1">
+        <h1 className="text-[28px] tracking-tight text-zinc-900 dark:text-white">My Trips</h1>
+        <Link
+          href="/app/trips/new"
+          className="bg-gradient-to-br from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-600 p-3 rounded-2xl transition-all shadow-lg shadow-orange-600/30"
+        >
+          <Plus className="w-6 h-6 text-white" strokeWidth={2.5} />
+        </Link>
       </div>
 
-      {trips.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-          <MapPin className="w-16 h-16 text-dim mb-4" />
-          <h2 className="text-xl font-semibold mb-2">No trips yet</h2>
-          <p className="text-mid mb-6">Create your first trip and start discovering activities.</p>
-          <button onClick={() => setShowCreate(true)} className="btn-teal">
-            Create Trip
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {trips.map(trip => (
-            <TripCard key={trip.id} trip={trip} />
+      {/* Active Trips */}
+      {activeTrips.length > 0 && (
+        <div className="mb-5">
+          {activeTrips.map((trip) => (
+            <button
+              key={trip.id}
+              onClick={() => handleTripClick(trip)}
+              className="w-full rounded-[28px] overflow-hidden shadow-xl border border-zinc-200/50 dark:border-transparent mb-5 text-left"
+            >
+              <div className="bg-gradient-to-br from-orange-600 via-orange-500 to-orange-600 p-6">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h2 className="text-[24px] mb-1.5 font-semibold tracking-tight text-white">{trip.name}</h2>
+                    <p className="text-orange-50 text-[15px] font-medium">{trip.dates} · {trip.duration}</p>
+                  </div>
+                  <span className="bg-white text-orange-600 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide shadow-lg">
+                    {trip.status.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white p-6">
+                {/* Cities */}
+                <div className="flex items-center justify-between mb-6 overflow-x-auto pb-2">
+                  {trip.cities.map((city, index) => (
+                    <div key={city.name} className="flex items-center gap-2">
+                      <div className="flex flex-col items-center min-w-[70px]">
+                        <div className="bg-orange-50 dark:bg-orange-900/30 p-3.5 rounded-2xl mb-2 border border-orange-100/80 dark:border-orange-800/50">
+                          <span className="text-2xl">{city.flag}</span>
+                        </div>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{city.name}</span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-500 font-medium mt-0.5">{city.days}d</span>
+                      </div>
+                      {index < trip.cities.length - 1 && (
+                        <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-zinc-600 mb-8 flex-shrink-0" strokeWidth={2} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Stats */}
+                <div className="flex items-center gap-5 mb-5 pb-5 border-b border-zinc-100 dark:border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center border border-orange-100/50 dark:border-transparent">
+                      <Users className="w-4 h-4 text-orange-600 dark:text-orange-400" strokeWidth={2} />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{trip.members} members</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center border border-teal-100/50 dark:border-transparent">
+                      <Bookmark className="w-4 h-4 text-teal-600 dark:text-teal-400" strokeWidth={2} />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{trip.saved} saved</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center border border-blue-100/50 dark:border-transparent">
+                      <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400" strokeWidth={2} />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{trip.cityCount} cities</span>
+                  </div>
+                </div>
+
+                {/* Members & Code */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex -space-x-3">
+                      {trip.memberInitials.map((initial, index) => (
+                        <div
+                          key={index}
+                          className={`w-10 h-10 rounded-full ${trip.memberColors[index]} flex items-center justify-center text-white text-sm font-bold border-[3px] border-white dark:border-zinc-950 shadow-md`}
+                        >
+                          {initial}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/30 px-3 py-2 rounded-xl border border-orange-100/80 dark:border-orange-800/50">
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Code:</span>
+                      <span className="text-sm text-orange-600 dark:text-orange-400 font-bold tracking-wide">{trip.code}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
           ))}
         </div>
       )}
 
-      {/* Create Trip Modal */}
-      {showCreate && (
-        <CreateTripModal
-          onClose={() => setShowCreate(false)}
-          onCreated={() => { setShowCreate(false); loadTrips() }}
-        />
+      {/* Completed Trips */}
+      {completedTrips.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-[15px] font-semibold mb-3 text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Completed</h3>
+          {completedTrips.map((trip) => (
+            <button
+              key={trip.id}
+              onClick={() => handleTripClick(trip)}
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[24px] p-5 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors shadow-sm dark:shadow-none mb-3"
+            >
+              <div className="bg-zinc-100 dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-200/50 dark:border-zinc-700">
+                <span className="text-3xl">{trip.cities[0].flag}</span>
+              </div>
+              <div className="flex-1 text-left">
+                <h3 className="text-[17px] mb-1 font-semibold text-zinc-900 dark:text-white">{trip.name}</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">{trip.dates} · {trip.status}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-400 dark:text-zinc-600" />
+            </button>
+          ))}
+        </div>
       )}
-    </div>
-  )
-}
 
-function TripCard({ trip }: { trip: Trip }) {
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return null
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  return (
-    <Link href={`/app/trips/${trip.id}`}>
-      <div className="card hover:border-border transition-all group cursor-pointer">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold group-hover:text-orange transition-colors">
-              {trip.title}
-            </h3>
-
-            <div className="flex items-center gap-3 mt-2 text-sm text-mid">
-              {trip.destinations && trip.destinations.length > 0 && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
-                  {trip.destinations.join(', ')}
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4 mt-2 text-xs text-dim">
-              {trip.start_date && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {formatDate(trip.start_date)}
-                  {trip.end_date && ` – ${formatDate(trip.end_date)}`}
-                </span>
-              )}
-              {trip.mode && (
-                <span className="bg-teal/20 text-teal-light px-2 py-0.5 rounded-full">
-                  {trip.mode}
-                </span>
-              )}
-            </div>
+      {/* Plan New Trip */}
+      <Link
+        href="/app/trips/new"
+        className="block bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-800 border-dashed rounded-[28px] p-10 text-center hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-all shadow-sm dark:shadow-none"
+      >
+        <div className="flex justify-center mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 flex items-center justify-center">
+            <Plus className="w-8 h-8 text-zinc-500 dark:text-zinc-600" strokeWidth={2} />
           </div>
-
-          {trip.budget && (
-            <div className="text-right">
-              <span className="text-sm font-medium text-gold">
-                {trip.currency || '$'}{trip.budget.toLocaleString()}
-              </span>
-            </div>
-          )}
         </div>
-      </div>
-    </Link>
-  )
-}
-
-function CreateTripModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const { user } = useAuth()
-  const [title, setTitle] = useState('')
-  const [destination, setDestination] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [budget, setBudget] = useState('')
-  const [currency, setCurrency] = useState('USD')
-  const [creating, setCreating] = useState(false)
-  const [error, setError] = useState('')
-  const supabase = createClient()
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user || !title.trim() || !destination.trim()) return
-
-    setCreating(true)
-    setError('')
-
-    const { error: createError } = await supabase.from('trips').insert({
-      owner_id: user.id,
-      title: title.trim(),
-      destinations: [destination.trim()],
-      start_date: startDate || null,
-      end_date: endDate || null,
-      budget: budget ? parseFloat(budget) : null,
-      currency: currency,
-      mode: 'planning',
-      status: 'active',
-    })
-
-    if (createError) {
-      setError(createError.message)
-      setCreating(false)
-    } else {
-      onCreated()
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center">
-      <div className="w-full max-w-md bg-card rounded-t-3xl sm:rounded-card border border-border/50 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-border/30">
-          <h2 className="text-lg font-semibold">Create Trip</h2>
-          <button onClick={onClose} className="text-dim hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleCreate} className="p-5 space-y-4">
-          <div>
-            <label className="text-sm text-mid mb-1 block">Trip Name</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Tokyo Adventure"
-              className="input-field"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-mid mb-1 block">Destination</label>
-            <input
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="Tokyo, Japan"
-              className="input-field"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-mid mb-1 block">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-mid mb-1 block">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="input-field"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className="text-sm text-mid mb-1 block">Budget</label>
-              <input
-                type="number"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                placeholder="5000"
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-mid mb-1 block">Currency</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="input-field"
-              >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="JPY">JPY</option>
-              </select>
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 rounded-button px-4 py-3">{error}</p>
-          )}
-
-          <button type="submit" disabled={creating} className="btn-primary w-full">
-            {creating ? 'Creating...' : 'Create Trip'}
-          </button>
-        </form>
-      </div>
+        <h3 className="text-xl mb-2 font-semibold text-zinc-900 dark:text-white">Plan a New Trip</h3>
+        <p className="text-zinc-500 dark:text-zinc-500 text-[15px]">One city or many — we handle the route</p>
+      </Link>
     </div>
   )
 }
