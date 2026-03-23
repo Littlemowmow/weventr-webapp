@@ -5,13 +5,14 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { AuthProvider } from '@/lib/auth-context'
 import Link from 'next/link'
-import { Compass, Map, User, Loader2 } from 'lucide-react'
+import { Compass, Map, User, Loader2, Shuffle } from 'lucide-react'
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   const tabs = [
     { href: '/app/discover', icon: Compass, label: 'Discover' },
+    { href: '/app/blind-match', icon: Shuffle, label: 'Blind Match' },
     { href: '/app/trips', icon: Map, label: 'Trips' },
     { href: '/app/profile', icon: User, label: 'Profile' },
   ]

@@ -9,7 +9,10 @@ import Link from 'next/link'
 import {
   ArrowLeft, MapPin, Calendar, Users, ThumbsUp, ThumbsDown,
   Share2, Copy, Check, Plus, Loader2, DollarSign, Plane, Clock,
-  PieChart, Wallet, TrendingUp
+  PieChart, Wallet, TrendingUp, ChevronLeft, ChevronRight,
+  Sunrise, Sun, Sunset, Moon, Coffee, Utensils, Camera,
+  Music, ShoppingBag, Receipt, CreditCard, Split, UserPlus,
+  BarChart3
 } from 'lucide-react'
 
 type DashboardTab = 'overview' | 'schedule' | 'budget' | 'logistics'
@@ -303,36 +306,207 @@ function ProposalCard({
 function ScheduleTab({ proposals, trip }: { proposals: ProposalRow[]; trip: Trip }) {
   const approved = proposals.filter(p => p.net_votes > 0)
 
+  // Calculate trip days
+  const startDate = trip.start_date ? new Date(trip.start_date) : null
+  const endDate = trip.end_date ? new Date(trip.end_date) : null
+  const totalDays = startDate && endDate
+    ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+    : Math.max(1, Math.ceil(approved.length / 3))
+
+  const [selectedDay, setSelectedDay] = useState(0)
+
+  // Distribute approved activities across days
+  const activitiesPerDay = Math.max(1, Math.ceil(approved.length / totalDays))
+  const daySchedules = Array.from({ length: totalDays }, (_, dayIndex) => {
+    const dayActivities = approved.slice(dayIndex * activitiesPerDay, (dayIndex + 1) * activitiesPerDay)
+    return dayActivities.map((activity, i) => {
+      const timeSlots = ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00']
+      const periods: Array<{ icon: React.ReactNode; label: string; color: string }> = [
+        { icon: <Sunrise className="w-3.5 h-3.5" />, label: 'Morning', color: 'text-gold' },
+        { icon: <Sun className="w-3.5 h-3.5" />, label: 'Late Morning', color: 'text-orange' },
+        { icon: <Coffee className="w-3.5 h-3.5" />, label: 'Afternoon', color: 'text-teal-light' },
+        { icon: <Sunset className="w-3.5 h-3.5" />, label: 'Late Afternoon', color: 'text-orange-light' },
+        { icon: <Moon className="w-3.5 h-3.5" />, label: 'Evening', color: 'text-mid' },
+        { icon: <Music className="w-3.5 h-3.5" />, label: 'Night', color: 'text-dim' },
+      ]
+      return {
+        ...activity,
+        time: timeSlots[i % timeSlots.length],
+        period: periods[i % periods.length],
+      }
+    })
+  })
+
+  const currentDayDate = startDate
+    ? new Date(startDate.getTime() + selectedDay * 24 * 60 * 60 * 1000)
+    : null
+
   return (
     <div className="space-y-4 pb-8">
-      <div className="card-raised">
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-4 h-4 text-orange" />
-          <h3 className="font-semibold text-sm">Itinerary Preview</h3>
+      {/* Day Navigation */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setSelectedDay(d => Math.max(0, d - 1))}
+          disabled={selectedDay === 0}
+          className="p-1.5 rounded-lg bg-raised hover:bg-border transition-colors disabled:opacity-30"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        <div className="flex-1 overflow-x-auto flex gap-2 scrollbar-hide">
+          {Array.from({ length: totalDays }, (_, i) => {
+            const dayDate = startDate
+              ? new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000)
+              : null
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDay(i)}
+                className={`flex flex-col items-center min-w-[52px] py-2 px-3 rounded-xl transition-all ${
+                  selectedDay === i
+                    ? 'bg-orange text-white'
+                    : 'bg-raised text-mid hover:bg-border'
+                }`}
+              >
+                <span className="text-[10px] font-medium uppercase">
+                  {dayDate ? dayDate.toLocaleDateString('en-US', { weekday: 'short' }) : `Day`}
+                </span>
+                <span className="text-lg font-bold">
+                  {dayDate ? dayDate.getDate() : i + 1}
+                </span>
+              </button>
+            )
+          })}
         </div>
-        {approved.length === 0 ? (
-          <p className="text-mid text-sm">Vote on activities in the Overview tab to build your schedule.</p>
-        ) : (
-          <div className="space-y-3">
-            {approved.map((proposal, i) => (
-              <div key={proposal.activity_id} className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-raised flex items-center justify-center text-xs font-bold text-orange flex-shrink-0">
-                  {i + 1}
+
+        <button
+          onClick={() => setSelectedDay(d => Math.min(totalDays - 1, d + 1))}
+          disabled={selectedDay === totalDays - 1}
+          className="p-1.5 rounded-lg bg-raised hover:bg-border transition-colors disabled:opacity-30"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold">
+            Day {selectedDay + 1}
+            {currentDayDate && (
+              <span className="text-mid font-normal ml-2 text-sm">
+                {currentDayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </span>
+            )}
+          </h3>
+          <p className="text-xs text-dim mt-0.5">
+            {daySchedules[selectedDay]?.length || 0} activities planned
+          </p>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {daySchedules[selectedDay]?.length > 0 ? (
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute left-[23px] top-6 bottom-6 w-0.5 bg-border/50" />
+
+          <div className="space-y-1">
+            {daySchedules[selectedDay].map((item, i) => (
+              <div key={item.activity_id} className="relative flex items-start gap-4">
+                {/* Timeline dot */}
+                <div className="relative z-10 flex flex-col items-center flex-shrink-0">
+                  <div className={`w-[46px] text-center text-[10px] font-mono mb-1 ${item.period.color}`}>
+                    {item.time}
+                  </div>
+                  <div className={`w-3 h-3 rounded-full border-2 border-card ${
+                    i === 0 ? 'bg-orange' : 'bg-raised'
+                  }`} />
                 </div>
-                <div>
-                  <p className="font-medium text-sm">{proposal.activity_name}</p>
-                  <p className="text-xs text-dim">{proposal.city}{proposal.neighborhood ? ` · ${proposal.neighborhood}` : ''}</p>
+
+                {/* Activity Card */}
+                <div className="card flex-1 mb-2">
+                  <div className="flex items-start gap-3">
+                    {(item.images?.[0] || item.image_url) && (
+                      <img
+                        src={item.images?.[0] || item.image_url || ''}
+                        alt={item.activity_name}
+                        className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className={item.period.color}>{item.period.icon}</span>
+                        <span className="text-xs text-dim">{item.period.label}</span>
+                      </div>
+                      <h4 className="font-semibold text-sm">{item.activity_name}</h4>
+                      {item.city && (
+                        <p className="text-xs text-dim flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3" />
+                          {item.city}
+                          {item.neighborhood && ` · ${item.neighborhood}`}
+                        </p>
+                      )}
+                      {item.activity_description && (
+                        <p className="text-xs text-mid mt-1 line-clamp-2">{item.activity_description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vote indicator */}
+                  <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/30">
+                    <span className="text-xs text-teal-light flex items-center gap-1">
+                      <ThumbsUp className="w-3 h-3" />
+                      {item.upvote_count} votes
+                    </span>
+                    <span className="text-xs text-dim">
+                      Score: +{item.net_votes}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="card text-center py-10">
+          <Calendar className="w-10 h-10 text-dim mx-auto mb-3" />
+          <p className="text-mid font-medium">No activities for this day</p>
+          <p className="text-dim text-sm mt-1">
+            Vote on activities in the Overview tab to fill your schedule
+          </p>
+        </div>
+      )}
 
-      <div className="card text-center py-8">
-        <p className="text-mid text-sm">AI itinerary generation coming soon</p>
-        <p className="text-dim text-xs mt-1">Vote on activities first, then generate a day-by-day plan</p>
-      </div>
+      {/* Summary Card */}
+      {approved.length > 0 && (
+        <div className="card-raised">
+          <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-teal-light" />
+            Schedule Summary
+          </h4>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-card rounded-xl py-3 px-2">
+              <p className="text-xl font-bold text-orange">{totalDays}</p>
+              <p className="text-[10px] text-dim uppercase tracking-wider">Days</p>
+            </div>
+            <div className="bg-card rounded-xl py-3 px-2">
+              <p className="text-xl font-bold text-teal-light">{approved.length}</p>
+              <p className="text-[10px] text-dim uppercase tracking-wider">Activities</p>
+            </div>
+            <div className="bg-card rounded-xl py-3 px-2">
+              <p className="text-xl font-bold text-gold">
+                {approved.reduce((sum, p) => {
+                  const cities = new Set()
+                  if (p.city) cities.add(p.city)
+                  return cities.size
+                }, 0) || approved.length > 0 ? [...new Set(approved.map(p => p.city).filter(Boolean))].length : 0}
+              </p>
+              <p className="text-[10px] text-dim uppercase tracking-wider">Locations</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -342,82 +516,206 @@ function ScheduleTab({ proposals, trip }: { proposals: ProposalRow[]; trip: Trip
 function BudgetTab({ trip, proposals }: { trip: Trip; proposals: ProposalRow[] }) {
   const totalBudget = trip.budget || 0
   const currency = trip.currency || 'USD'
+  const [showAddExpense, setShowAddExpense] = useState(false)
+  const [expenses, setExpenses] = useState<Array<{
+    id: string; name: string; amount: number; category: string; paidBy: string
+  }>>([])
 
-  // Estimate costs from proposals (simplified)
+  const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'JPY' ? '¥' : currency + ' '
+
+  // Estimate costs from proposals
+  const activityCost = proposals.filter(p => p.net_votes > 0).length * 45
   const categories = [
-    { name: 'Activities', icon: <MapPin className="w-4 h-4" />, estimated: proposals.length * 45, color: 'text-orange' },
-    { name: 'Food & Drink', icon: <DollarSign className="w-4 h-4" />, estimated: 0, color: 'text-gold' },
-    { name: 'Transport', icon: <Plane className="w-4 h-4" />, estimated: 0, color: 'text-teal-light' },
-    { name: 'Accommodation', icon: <Wallet className="w-4 h-4" />, estimated: 0, color: 'text-mid' },
+    { name: 'Activities', icon: <Camera className="w-4 h-4" />, estimated: activityCost, color: 'bg-orange', textColor: 'text-orange' },
+    { name: 'Food & Drink', icon: <Utensils className="w-4 h-4" />, estimated: expenses.filter(e => e.category === 'food').reduce((s, e) => s + e.amount, 0), color: 'bg-gold', textColor: 'text-gold' },
+    { name: 'Transport', icon: <Plane className="w-4 h-4" />, estimated: expenses.filter(e => e.category === 'transport').reduce((s, e) => s + e.amount, 0), color: 'bg-teal', textColor: 'text-teal-light' },
+    { name: 'Shopping', icon: <ShoppingBag className="w-4 h-4" />, estimated: expenses.filter(e => e.category === 'shopping').reduce((s, e) => s + e.amount, 0), color: 'bg-mid', textColor: 'text-mid' },
+    { name: 'Accommodation', icon: <Wallet className="w-4 h-4" />, estimated: expenses.filter(e => e.category === 'accommodation').reduce((s, e) => s + e.amount, 0), color: 'bg-green-500', textColor: 'text-green-400' },
   ]
 
   const totalEstimated = categories.reduce((sum, c) => sum + c.estimated, 0)
   const remaining = totalBudget - totalEstimated
+  const percentUsed = totalBudget > 0 ? Math.min(100, (totalEstimated / totalBudget) * 100) : 0
+
+  const handleAddExpense = (name: string, amount: number, category: string) => {
+    setExpenses(prev => [...prev, {
+      id: Date.now().toString(),
+      name,
+      amount,
+      category,
+      paidBy: 'You',
+    }])
+    setShowAddExpense(false)
+  }
 
   return (
     <div className="space-y-4 pb-8">
-      {/* Budget Overview */}
+      {/* Budget Ring / Overview */}
       <div className="card-raised">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <PieChart className="w-4 h-4 text-gold" />
-            <h3 className="font-semibold text-sm">Budget Lock</h3>
+            <h3 className="font-semibold text-sm">Budget Overview</h3>
           </div>
-          {totalBudget > 0 && (
-            <span className="text-gold font-bold">
-              {currency} {totalBudget.toLocaleString()}
-            </span>
-          )}
+          <button
+            onClick={() => setShowAddExpense(true)}
+            className="flex items-center gap-1.5 text-xs text-orange hover:text-orange-light transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Expense
+          </button>
         </div>
 
-        {totalBudget > 0 ? (
-          <>
-            {/* Progress bar */}
-            <div className="w-full h-3 bg-raised rounded-full overflow-hidden mb-3">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  remaining < 0 ? 'bg-red-500' : remaining < totalBudget * 0.2 ? 'bg-gold' : 'bg-teal'
-                }`}
-                style={{ width: `${Math.min(100, (totalEstimated / totalBudget) * 100)}%` }}
+        {/* Visual Budget Display */}
+        <div className="flex items-center gap-5 mb-5">
+          {/* Circular Progress */}
+          <div className="relative w-24 h-24 flex-shrink-0">
+            <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-raised" />
+              <circle
+                cx="48" cy="48" r="40" fill="none" strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${percentUsed * 2.51} 251`}
+                className={remaining < 0 ? 'stroke-red-500' : remaining < totalBudget * 0.2 ? 'stroke-gold' : 'stroke-teal'}
               />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-lg font-bold">{Math.round(percentUsed)}%</span>
+              <span className="text-[9px] text-dim">used</span>
             </div>
+          </div>
 
-            <div className="flex justify-between text-xs text-dim mb-4">
-              <span>Estimated: {currency} {totalEstimated.toLocaleString()}</span>
-              <span className={remaining < 0 ? 'text-red-400' : 'text-green-400'}>
-                {remaining >= 0 ? `${currency} ${remaining.toLocaleString()} left` : `Over by ${currency} ${Math.abs(remaining).toLocaleString()}`}
-              </span>
+          {/* Budget Numbers */}
+          <div className="flex-1 space-y-2">
+            {totalBudget > 0 ? (
+              <>
+                <div>
+                  <p className="text-xs text-dim">Total Budget</p>
+                  <p className="text-lg font-bold text-gold">{currencySymbol}{totalBudget.toLocaleString()}</p>
+                </div>
+                <div className="flex gap-4">
+                  <div>
+                    <p className="text-xs text-dim">Spent</p>
+                    <p className="text-sm font-semibold">{currencySymbol}{totalEstimated.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-dim">Remaining</p>
+                    <p className={`text-sm font-semibold ${remaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {remaining >= 0 ? `${currencySymbol}${remaining.toLocaleString()}` : `-${currencySymbol}${Math.abs(remaining).toLocaleString()}`}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <p className="text-mid text-sm">No budget set</p>
+                <p className="text-dim text-xs mt-1">Edit trip to set a budget</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Category Breakdown - Stacked bar */}
+        {totalEstimated > 0 && (
+          <div className="mb-4">
+            <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
+              {categories.filter(c => c.estimated > 0).map(cat => (
+                <div
+                  key={cat.name}
+                  className={`${cat.color} rounded-full transition-all`}
+                  style={{ width: `${(cat.estimated / totalEstimated) * 100}%` }}
+                />
+              ))}
             </div>
-          </>
-        ) : (
-          <p className="text-mid text-sm mb-4">Set a budget when creating the trip to track spending here.</p>
+          </div>
         )}
 
-        {/* Categories */}
+        {/* Categories List */}
         <div className="space-y-3">
           {categories.map(cat => (
             <div key={cat.name} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className={cat.color}>{cat.icon}</span>
-                <span className="text-sm">{cat.name}</span>
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg ${cat.color}/20 flex items-center justify-center`}>
+                  <span className={cat.textColor}>{cat.icon}</span>
+                </div>
+                <div>
+                  <span className="text-sm">{cat.name}</span>
+                  {totalEstimated > 0 && cat.estimated > 0 && (
+                    <p className="text-[10px] text-dim">{Math.round((cat.estimated / totalEstimated) * 100)}% of total</p>
+                  )}
+                </div>
               </div>
-              <span className="text-sm text-mid">
-                {cat.estimated > 0 ? `${currency} ${cat.estimated}` : '—'}
+              <span className={`text-sm font-medium ${cat.estimated > 0 ? 'text-white' : 'text-dim'}`}>
+                {cat.estimated > 0 ? `${currencySymbol}${cat.estimated.toLocaleString()}` : '—'}
               </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Per Person Split */}
+      {/* Recent Expenses */}
       <div className="card">
         <div className="flex items-center gap-2 mb-3">
+          <Receipt className="w-4 h-4 text-orange" />
+          <h3 className="font-semibold text-sm">Recent Expenses</h3>
+        </div>
+
+        {expenses.length > 0 ? (
+          <div className="space-y-2">
+            {expenses.slice().reverse().map(exp => (
+              <div key={exp.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-raised flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-mid" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{exp.name}</p>
+                    <p className="text-xs text-dim">Paid by {exp.paidBy}</p>
+                  </div>
+                </div>
+                <span className="text-sm font-semibold">{currencySymbol}{exp.amount}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <Receipt className="w-8 h-8 text-dim/40 mx-auto mb-2" />
+            <p className="text-mid text-sm">No expenses yet</p>
+            <p className="text-dim text-xs mt-1">Track spending as you go</p>
+          </div>
+        )}
+      </div>
+
+      {/* Cost Split */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
           <Users className="w-4 h-4 text-teal-light" />
           <h3 className="font-semibold text-sm">Cost Split</h3>
         </div>
-        <p className="text-mid text-sm">
-          Split tracking and expense sharing coming soon. Track who owes what as you book activities.
-        </p>
+
+        <div className="space-y-3">
+          {/* Per person estimate */}
+          <div className="bg-raised rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-dim">Estimated Per Person</p>
+              <p className="text-lg font-bold text-teal-light">
+                {currencySymbol}{totalEstimated > 0 ? Math.round(totalEstimated / Math.max(1, 2)).toLocaleString() : '0'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-8 h-8 rounded-full bg-card border-2 border-raised flex items-center justify-center text-[10px] font-bold">
+                You
+              </div>
+              <div className="w-8 h-8 rounded-full bg-card border-2 border-raised flex items-center justify-center">
+                <UserPlus className="w-3.5 h-3.5 text-dim" />
+              </div>
+            </div>
+          </div>
+
+          <p className="text-dim text-xs text-center">
+            Split adjustments and IOUs coming soon
+          </p>
+        </div>
       </div>
 
       {/* Spending Insights */}
@@ -426,9 +724,124 @@ function BudgetTab({ trip, proposals }: { trip: Trip; proposals: ProposalRow[] }
           <TrendingUp className="w-4 h-4 text-orange" />
           <h3 className="font-semibold text-sm">Spending Insights</h3>
         </div>
-        <p className="text-mid text-sm">
-          Insights will appear as you add activities and set costs.
-        </p>
+
+        {totalEstimated > 0 ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 py-2">
+              <div className="w-8 h-8 rounded-full bg-teal/20 flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-teal-light" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm">Average per day</p>
+                <p className="text-xs text-dim">
+                  {currencySymbol}{Math.round(totalEstimated / Math.max(1, proposals.filter(p => p.net_votes > 0).length > 3 ? 3 : 1)).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 py-2">
+              <div className="w-8 h-8 rounded-full bg-orange/20 flex items-center justify-center">
+                <Camera className="w-4 h-4 text-orange" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm">Top category</p>
+                <p className="text-xs text-dim">Activities ({currencySymbol}{activityCost})</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-mid text-sm">
+            Insights will appear as you add activities and expenses.
+          </p>
+        )}
+      </div>
+
+      {/* Add Expense Modal */}
+      {showAddExpense && (
+        <AddExpenseModal
+          currency={currencySymbol}
+          onAdd={handleAddExpense}
+          onClose={() => setShowAddExpense(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function AddExpenseModal({
+  currency, onAdd, onClose
+}: {
+  currency: string
+  onAdd: (name: string, amount: number, category: string) => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState('')
+  const [category, setCategory] = useState('food')
+
+  const categoryOptions = [
+    { value: 'food', label: 'Food & Drink', icon: <Utensils className="w-4 h-4" /> },
+    { value: 'transport', label: 'Transport', icon: <Plane className="w-4 h-4" /> },
+    { value: 'shopping', label: 'Shopping', icon: <ShoppingBag className="w-4 h-4" /> },
+    { value: 'accommodation', label: 'Stay', icon: <Wallet className="w-4 h-4" /> },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-lg bg-card rounded-t-2xl p-5 space-y-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Add Expense</h3>
+          <button onClick={onClose} className="text-dim hover:text-white">
+            <Plus className="w-5 h-5 rotate-45" />
+          </button>
+        </div>
+
+        <input
+          type="text"
+          placeholder="What did you spend on?"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="input-field"
+        />
+
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-dim">{currency}</span>
+          <input
+            type="number"
+            placeholder="0.00"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            className="input-field pl-8"
+          />
+        </div>
+
+        {/* Category chips */}
+        <div className="flex gap-2 flex-wrap">
+          {categoryOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setCategory(opt.value)}
+              className={`chip flex items-center gap-1.5 ${
+                category === opt.value ? 'chip-active' : 'chip-inactive'
+              }`}
+            >
+              {opt.icon}
+              <span>{opt.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => {
+            if (name && amount) onAdd(name, parseFloat(amount), category)
+          }}
+          disabled={!name || !amount}
+          className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Add Expense
+        </button>
       </div>
     </div>
   )
