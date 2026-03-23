@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-white antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-bg;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-raised rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dim;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-orange hover:bg-orange-light text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 active:scale-95;
+  }
+  .btn-secondary {
+    @apply bg-raised hover:bg-border text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 active:scale-95;
+  }
+  .btn-teal {
+    @apply bg-teal hover:bg-teal-light text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 active:scale-95;
+  }
+  .card {
+    @apply bg-card rounded-card border border-border/50 p-5;
+  }
+  .card-raised {
+    @apply bg-raised rounded-card border border-border/50 p-5;
+  }
+  .input-field {
+    @apply w-full bg-raised border border-border rounded-button px-4 py-3 text-white placeholder-dim focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal transition-colors;
+  }
+  .chip {
+    @apply px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer;
+  }
+  .chip-active {
+    @apply bg-teal text-white;
+  }
+  .chip-inactive {
+    @apply bg-raised text-mid hover:bg-border;
+  }
+  .tab-active {
+    @apply text-orange border-b-2 border-orange font-semibold;
+  }
+  .tab-inactive {
+    @apply text-dim hover:text-mid border-b-2 border-transparent;
+  }
+}
